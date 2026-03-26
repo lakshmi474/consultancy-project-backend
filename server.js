@@ -6,12 +6,19 @@ import nodemailer from "nodemailer";
 import ordersRouter from "./routes/orders.js";
 import usersRouter from "./routes/users.js";
 import medicinesRouter from "./routes/medicines.js";
+import { sendOrderNotification } from "./utils/email.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
+
+// Request logger
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
+});
 
 // MongoDB Connection
 mongoose
@@ -42,87 +49,11 @@ const transporter = nodemailer.createTransport({
 app.post("/api/notify-order-email", async (req, res) => {
   try {
     const { order } = req.body;
-
     if (!order || !order.orderId) {
       return res.status(400).json({ error: "Order data is required" });
     }
-
-    const lines = [
-      `<strong>Order ID:</strong> ${order.orderId}`,
-      `<strong>Customer:</strong> ${order.name} (${order.email || "N/A"})`,
-      `<strong>Phone:</strong> ${order.phone || "N/A"}`,
-      `<strong>Address:</strong> ${order.address}, ${order.city}, ${order.state} - ${order.pincode}`,
-      `<strong>Payment Method:</strong> ${order.paymentMethod?.toUpperCase()}`,
-      `<strong>Payment Status:</strong> ${order.paymentStatus || "N/A"}`,
-      `<strong>Status:</strong> ${order.status || "Ready"}`,
-      `<strong>Subtotal:</strong> ₹${Number(order.subtotal || 0).toFixed(2)}`,
-      `<strong>Delivery Charge:</strong> ₹${Number(order.deliveryCharge || 0).toFixed(2)}`,
-      `<strong>Total:</strong> ₹${Number(order.total || 0).toFixed(2)}`,
-      "",
-      "<strong>Items:</strong>",
-    ];
-
-    if (Array.isArray(order.items)) {
-      order.items.forEach((item, index) => {
-        lines.push(
-          `${index + 1}. ${item.name} x${item.quantity} — ₹${(
-            item.price * item.quantity
-          ).toFixed(2)}`
-        );
-      });
-    }
-
-    lines.push("", "<strong>Prescriptions:</strong>");
-    if (Array.isArray(order.prescriptionFiles) && order.prescriptionFiles.length) {
-      order.prescriptionFiles.forEach((file, index) => {
-        const label = typeof file === "string" ? file : file.name;
-        lines.push(`${index + 1}. ${label}`);
-      });
-    } else {
-      lines.push("No prescription files uploaded.");
-    }
-
-    const html = `
-      <h2>New Order Placed</h2>
-      <p>A new order has been placed from the Medicine web app.</p>
-      <div>${lines.join("<br/>")}</div>
-    `;
-
-    // Build attachments from base64 data (if present)
-    const attachments = [];
-    if (Array.isArray(order.prescriptionFiles)) {
-      order.prescriptionFiles.forEach((file) => {
-        if (file && typeof file === "object" && file.dataUrl) {
-          const [meta, base64Data] = String(file.dataUrl).split(",");
-          if (!base64Data) return;
-
-          const mimeMatch = meta.match(/data:(.*);base64/);
-          const mimeType =
-            file.type || (mimeMatch ? mimeMatch[1] : "application/octet-stream");
-
-          attachments.push({
-            filename: file.name || "prescription",
-            content: base64Data,
-            encoding: "base64",
-            contentType: mimeType,
-          });
-        }
-      });
-    }
-
-    await transporter.sendMail({
-      from: order.email
-        ? `"${order.name || "Customer"} via Star MediCare" <${
-            process.env.EMAIL_FROM || process.env.EMAIL_USER
-          }>`
-        : process.env.EMAIL_FROM || process.env.EMAIL_USER,
-      to: "ktilango@gmail.com",
-      replyTo: order.email || undefined,
-      subject: `New Order: ${order.orderId}`,
-      html,
-      attachments,
-    });
-
+    
+    await sendOrderNotification(order, 'new_order');
     res.json({ success: true });
   } catch (error) {
     console.error("❌ Error sending order email:", error);

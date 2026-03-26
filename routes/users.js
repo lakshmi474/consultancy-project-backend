@@ -66,21 +66,25 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/users/profile - Get user profile (authenticated)
-router.get('/profile', async (req, res) => {
+// GET /api/users - List all users (Admin only)
+router.get('/', async (req, res) => {
   try {
-    // TODO: Implement profile fetching
-    res.json({ message: 'Get user profile - To be implemented (Authenticated)' });
+    const users = await User.find({}).select('-password');
+    res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// PUT /api/users/profile - Update user profile (authenticated)
-router.put('/profile', async (req, res) => {
+// PUT /api/users/:id/toggle-status - Block/Unblock user (Admin)
+router.put('/:id/toggle-status', async (req, res) => {
   try {
-    // TODO: Implement profile update
-    res.json({ message: 'Update user profile - To be implemented (Authenticated)' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    user.isActive = !user.isActive;
+    await user.save();
+    res.json({ message: `User ${user.isActive ? 'unblocked' : 'blocked'} successfully`, user });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
