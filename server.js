@@ -2,7 +2,6 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import nodemailer from "nodemailer";
 import ordersRouter from "./routes/orders.js";
 import usersRouter from "./routes/users.js";
 import medicinesRouter from "./routes/medicines.js";
@@ -36,14 +35,6 @@ app.use("/api/orders", ordersRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/medicines", medicinesRouter);
 
-// Nodemailer transporter (configure via .env)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // Send order summary + prescription info email
 app.post("/api/notify-order-email", async (req, res) => {

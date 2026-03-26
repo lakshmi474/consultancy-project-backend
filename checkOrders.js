@@ -18,7 +18,7 @@ async function run() {
     const orders = await Order.find().limit(5);
     console.log("Recent orders (last 5):");
     orders.forEach(o => {
-      console.log(`- Order #${o.orderNumber}: status=${o.status}, prescriptions=${o.prescriptionFiles?.length || 0}`);
+      console.log(`- Order #${o.orderNumber}: _id=${o._id}, status=${o.status}, prescriptions=${o.prescriptionFiles?.length || 0}`);
     });
     
     process.exit(0);

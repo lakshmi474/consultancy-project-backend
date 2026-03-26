@@ -52,6 +52,14 @@ router.post('/', async (req, res) => {
     
     await order.save();
 
+    // Populate user and items.medicine for email and response
+    const populatedOrder = await Order.findById(order._id).populate('user').populate('items.medicine');
+    
+    // Send order confirmation email
+    if (populatedOrder.user && populatedOrder.user.email) {
+      await sendOrderNotification(populatedOrder, 'new_order');
+    }
+
     // Decrease the stock for each medicine in the order
     if (order.items && order.items.length > 0) {
       for (const item of order.items) {

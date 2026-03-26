@@ -1,24 +1,17 @@
-import nodemailer from 'nodemailer';
+import https from 'https';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
 export const sendOrderNotification = async (order, type = 'new_order') => {
   try {
-    const userEmail = order.user?.email || order.email || 'ktilango@gmail.com';
+    const userEmail = order.user?.email || order.email || 'illakshmi2705@gmail.com';
     const userName = order.user?.name || order.name || 'Customer';
     
     let subject = `Order Update: ${order.orderNumber || order.orderId}`;
     let title = 'Order Update';
     let message = '';
+
 
     if (type === 'new_order') {
       subject = `New Order Placed: ${order.orderNumber || order.orderId}`;
@@ -64,17 +57,53 @@ export const sendOrderNotification = async (order, type = 'new_order') => {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: `"Star MediCare" <${process.env.EMAIL_USER}>`,
-      to: userEmail,
-      subject,
-      html,
+    const payload = JSON.stringify({
+      sender: {
+        name: "Star MediCare",
+        email: process.env.BREVO_SENDER_EMAIL || "illakshmi2705@gmail.com"
+      },
+      to: [{ email: userEmail, name: userName }],
+      subject: subject,
+      htmlContent: html
     });
 
-    console.log(`✅ Email sent to ${userEmail} for ${type}`);
-    return true;
+    const options = {
+      hostname: 'api.brevo.com',
+      path: '/v3/smtp/email',
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': process.env.BREVO_API_KEY,
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        let responseBody = '';
+        res.on('data', (chunk) => { responseBody += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            console.log(`✅ Email sent to ${userEmail} via Brevo API`);
+            resolve(true);
+          } else {
+            console.error(`❌ Brevo API error (${res.statusCode}):`, responseBody);
+            resolve(false);
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        console.error('❌ Error calling Brevo API:', error);
+        resolve(false);
+      });
+
+      req.write(payload);
+      req.end();
+    });
   } catch (error) {
-    console.error('❌ Error sending notification email:', error);
+    console.error('❌ Error in sendOrderNotification:', error);
     return false;
   }
 };
